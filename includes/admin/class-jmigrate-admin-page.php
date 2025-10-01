@@ -14,6 +14,8 @@ class JMigrate_Admin_Page {
         add_action( 'wp_ajax_jmigrate_get_import_status', [ $this, 'ajax_get_import_status' ] );
         add_action( 'wp_ajax_jmigrate_run_import_job', [ __CLASS__, 'ajax_run_import_job' ] );
         add_action( 'wp_ajax_nopriv_jmigrate_run_import_job', [ __CLASS__, 'ajax_run_import_job' ] );
+        add_action( 'wp_ajax_jmigrate_delete_archive', [ $this, 'ajax_delete_archive' ] );
+        add_action( 'wp_ajax_jmigrate_refresh_archives', [ $this, 'ajax_refresh_archives' ] );
     }
 
     /**
@@ -82,6 +84,7 @@ class JMigrate_Admin_Page {
 
         $archive_path = isset( $_POST['jmigrate_import_path'] ) ? sanitize_text_field( wp_unslash( $_POST['jmigrate_import_path'] ) ) : '';
         $selected     = isset( $_POST['jmigrate_archive_select'] ) ? sanitize_text_field( wp_unslash( $_POST['jmigrate_archive_select'] ) ) : '';
+        $cleanup_archive = isset( $_POST['jmigrate_cleanup_archive'] ) ? true : false;
         $files_strategy = isset( $_POST['jmigrate_files_strategy'] ) ? sanitize_text_field( wp_unslash( $_POST['jmigrate_files_strategy'] ) ) : 'content';
         if ( ! in_array( $files_strategy, [ 'all', 'content', 'skip' ], true ) ) {
             $files_strategy = 'all';
@@ -153,6 +156,7 @@ class JMigrate_Admin_Page {
             [
                 'archive'  => $archive_path,
                 'files'    => $files_strategy,
+                'cleanup'  => $cleanup_archive,
                 'messages' => [],
             ]
         );
@@ -273,9 +277,87 @@ class JMigrate_Admin_Page {
         }
 
         JMigrate_Job_Manager::append_message( $job_id, 'success', __( 'Import completed successfully.', 'jmigrate' ) );
+        
+        // Handle archive cleanup if requested
+        if ( ! empty( $job['cleanup'] ) && $job['cleanup'] && file_exists( $job['archive'] ) ) {
+            $jmigrate_dir = jmigrate_get_archive_directory();
+            // Security check - only delete files in jmigrate directory
+            if ( ! empty( $jmigrate_dir ) && 0 === strpos( $job['archive'], $jmigrate_dir ) ) {
+                if ( @unlink( $job['archive'] ) ) {
+                    JMigrate_Job_Manager::append_message( $job_id, 'info', __( 'Archive file deleted successfully.', 'jmigrate' ) );
+                } else {
+                    JMigrate_Job_Manager::append_message( $job_id, 'warning', __( 'Failed to delete archive file.', 'jmigrate' ) );
+                }
+            }
+        }
+        
         JMigrate_Job_Manager::update_job( $job_id, [ 'status' => 'success', 'progress' => 100 ] );
 
         wp_send_json_success();
+    }
+
+    /**
+     * Handles AJAX requests to delete an archive file.
+     */
+    public function ajax_delete_archive() {
+        check_ajax_referer( 'jmigrate_admin' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Insufficient permissions.', 'jmigrate' ) );
+        }
+
+        $archive_path = isset( $_POST['archive_path'] ) ? sanitize_text_field( wp_unslash( $_POST['archive_path'] ) ) : '';
+        if ( ! $archive_path ) {
+            wp_send_json_error( __( 'No archive path provided.', 'jmigrate' ) );
+        }
+
+        $archive_path = wp_normalize_path( $archive_path );
+        
+        // Security check - ensure file is in jmigrate directory
+        $jmigrate_dir = jmigrate_get_archive_directory();
+        if ( empty( $jmigrate_dir ) || 0 !== strpos( $archive_path, $jmigrate_dir ) ) {
+            wp_send_json_error( __( 'Invalid archive path.', 'jmigrate' ) );
+        }
+
+        if ( ! file_exists( $archive_path ) ) {
+            wp_send_json_error( __( 'Archive file not found.', 'jmigrate' ) );
+        }
+
+        if ( ! @unlink( $archive_path ) ) {
+            wp_send_json_error( __( 'Failed to delete archive file.', 'jmigrate' ) );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Archive deleted successfully.', 'jmigrate' ) ] );
+    }
+
+    /**
+     * Handles AJAX requests to refresh the archive list.
+     */
+    public function ajax_refresh_archives() {
+        check_ajax_referer( 'jmigrate_admin' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( __( 'Insufficient permissions.', 'jmigrate' ) );
+        }
+
+        $archives = $this->discover_archives();
+        $archive_list = [];
+        
+        foreach ( $archives as $archive_path ) {
+            $filename = basename( $archive_path );
+            $filesize = file_exists( $archive_path ) ? size_format( filesize( $archive_path ) ) : 'Unknown';
+            $modified = file_exists( $archive_path ) ? date( 'Y-m-d H:i:s', filemtime( $archive_path ) ) : 'Unknown';
+            
+            $archive_list[] = [
+                'path' => $archive_path,
+                'filename' => $filename,
+                'size' => $filesize,
+                'modified' => $modified,
+                'download_url' => $this->get_download_url_for_path( $archive_path )
+            ];
+        }
+
+        wp_send_json_success( [ 'archives' => $archive_list ] );
     }
 
     /**
@@ -333,6 +415,7 @@ class JMigrate_Admin_Page {
             check_admin_referer( 'jmigrate_run_import' );
 
             $archive_path = $import_path_value;
+            $cleanup_archive = isset( $_POST['jmigrate_cleanup_archive'] ) ? true : false;
             $uploaded_path = '';
 
             if ( ! empty( $_FILES['jmigrate_import_file']['name'] ) ) {
@@ -403,6 +486,19 @@ class JMigrate_Admin_Page {
                 try {
                     $importer->import( $archive_path, $logger, false, $files_strategy );
                     $import_success = true;
+                    
+                    // Handle archive cleanup if requested and import was successful
+                    if ( $cleanup_archive && file_exists( $archive_path ) ) {
+                        $jmigrate_dir = jmigrate_get_archive_directory();
+                        // Security check - only delete files in jmigrate directory
+                        if ( ! empty( $jmigrate_dir ) && 0 === strpos( $archive_path, $jmigrate_dir ) ) {
+                            if ( @unlink( $archive_path ) ) {
+                                $logger->info( __( 'Archive file deleted successfully.', 'jmigrate' ) );
+                            } else {
+                                $logger->warning( __( 'Failed to delete archive file.', 'jmigrate' ) );
+                            }
+                        }
+                    }
                 } catch ( JMigrate_Import_Exception $exception ) {
                     $import_errors[] = $exception->getMessage();
                 } catch ( \Throwable $throwable ) {
@@ -569,15 +665,70 @@ class JMigrate_Admin_Page {
                                 </td>
                             </tr>
                             <tr>
-                                <th scope="row"><?php esc_html_e( 'Known Archives', 'jmigrate' ); ?></th>
+                                <th scope="row">
+                                    <label for="jmigrate_cleanup_archive"><?php esc_html_e( 'After Import', 'jmigrate' ); ?></label>
+                                </th>
                                 <td>
-                                    <select name="jmigrate_archive_select" id="jmigrate_archive_select">
-                                        <option value=""><?php esc_html_e( 'Select an archive found in uploads/jmigrate', 'jmigrate' ); ?></option>
-                                        <?php foreach ( $context['available_archives'] as $archive ) : ?>
-                                            <option value="<?php echo esc_attr( $archive ); ?>" <?php selected( $context['import_selected'], $archive ); ?>><?php echo esc_html( $archive ); ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <p class="description"><?php esc_html_e( 'Choose a detected archive or leave blank if providing a custom path.', 'jmigrate' ); ?></p>
+                                    <label for="jmigrate_cleanup_archive">
+                                        <input type="checkbox" id="jmigrate_cleanup_archive" name="jmigrate_cleanup_archive" value="1">
+                                        <?php esc_html_e( 'Delete archive file after successful import', 'jmigrate' ); ?>
+                                    </label>
+                                    <p class="description"><?php esc_html_e( 'Automatically remove the archive file once the import completes successfully to save disk space.', 'jmigrate' ); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><?php esc_html_e( 'Archive Management', 'jmigrate' ); ?></th>
+                                <td>
+                                    <div id="jmigrate-archive-management">
+                                        <div style="margin-bottom: 10px;">
+                                            <select name="jmigrate_archive_select" id="jmigrate_archive_select" style="width: 300px;">
+                                                <option value=""><?php esc_html_e( 'Select an archive found in uploads/jmigrate', 'jmigrate' ); ?></option>
+                                                <?php foreach ( $context['available_archives'] as $archive ) : ?>
+                                                    <option value="<?php echo esc_attr( $archive ); ?>" <?php selected( $context['import_selected'], $archive ); ?>><?php echo esc_html( basename( $archive ) ); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="button" id="jmigrate-refresh-archives" class="button button-secondary"><?php esc_html_e( 'Refresh', 'jmigrate' ); ?></button>
+                                        </div>
+                                        
+                                        <?php if ( ! empty( $context['available_archives'] ) ) : ?>
+                                        <div id="jmigrate-archive-list">
+                                            <h4><?php esc_html_e( 'Available Archives:', 'jmigrate' ); ?></h4>
+                                            <table class="widefat striped" style="max-width: 600px;">
+                                                <thead>
+                                                    <tr>
+                                                        <th><?php esc_html_e( 'Filename', 'jmigrate' ); ?></th>
+                                                        <th><?php esc_html_e( 'Size', 'jmigrate' ); ?></th>
+                                                        <th><?php esc_html_e( 'Modified', 'jmigrate' ); ?></th>
+                                                        <th><?php esc_html_e( 'Actions', 'jmigrate' ); ?></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php foreach ( $context['available_archives'] as $archive_path ) : 
+                                                        $filename = basename( $archive_path );
+                                                        $filesize = file_exists( $archive_path ) ? size_format( filesize( $archive_path ) ) : 'Unknown';
+                                                        $modified = file_exists( $archive_path ) ? date( 'Y-m-d H:i:s', filemtime( $archive_path ) ) : 'Unknown';
+                                                        $download_url = $this->get_download_url_for_path( $archive_path );
+                                                    ?>
+                                                    <tr data-archive="<?php echo esc_attr( $archive_path ); ?>">
+                                                        <td><?php echo esc_html( $filename ); ?></td>
+                                                        <td><?php echo esc_html( $filesize ); ?></td>
+                                                        <td><?php echo esc_html( $modified ); ?></td>
+                                                        <td>
+                                                            <?php if ( $download_url ) : ?>
+                                                                <a href="<?php echo esc_url( $download_url ); ?>" class="button button-small" target="_blank"><?php esc_html_e( 'Download', 'jmigrate' ); ?></a>
+                                                            <?php endif; ?>
+                                                            <button type="button" class="button button-small jmigrate-delete-archive" data-archive="<?php echo esc_attr( $archive_path ); ?>"><?php esc_html_e( 'Delete', 'jmigrate' ); ?></button>
+                                                        </td>
+                                                    </tr>
+                                                    <?php endforeach; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <?php else : ?>
+                                        <p><em><?php esc_html_e( 'No archives found in uploads/jmigrate/', 'jmigrate' ); ?></em></p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <p class="description"><?php esc_html_e( 'Choose a detected archive or leave blank if providing a custom path. You can download or delete existing archives.', 'jmigrate' ); ?></p>
                                 </td>
                             </tr>
                         </tbody>
@@ -620,6 +771,66 @@ class JMigrate_Admin_Page {
             });
             
             console.log('Tab setup complete');
+            
+            // Archive management functionality
+            $('.jmigrate-delete-archive').on('click', function(e) {
+                e.preventDefault();
+                var archivePath = $(this).data('archive');
+                var filename = $(this).closest('tr').find('td:first').text();
+                
+                if (!confirm('Are you sure you want to delete "' + filename + '"? This action cannot be undone.')) {
+                    return;
+                }
+                
+                var button = $(this);
+                button.prop('disabled', true).text('Deleting...');
+                
+                $.post(ajaxurl, {
+                    action: 'jmigrate_delete_archive',
+                    archive_path: archivePath,
+                    _ajax_nonce: '<?php echo wp_create_nonce( 'jmigrate_admin' ); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        button.closest('tr').fadeOut(function() {
+                            $(this).remove();
+                            // Update select dropdown
+                            $('#jmigrate_archive_select option[value="' + archivePath + '"]').remove();
+                            // Check if no archives left
+                            if ($('#jmigrate-archive-list tbody tr').length === 0) {
+                                $('#jmigrate-archive-list').html('<p><em>No archives found in uploads/jmigrate/</em></p>');
+                            }
+                        });
+                    } else {
+                        alert('Error: ' + (response.data || 'Failed to delete archive'));
+                        button.prop('disabled', false).text('Delete');
+                    }
+                }).fail(function() {
+                    alert('Error: Failed to communicate with server');
+                    button.prop('disabled', false).text('Delete');
+                });
+            });
+            
+            // Refresh archives functionality
+            $('#jmigrate-refresh-archives').on('click', function(e) {
+                e.preventDefault();
+                var button = $(this);
+                button.prop('disabled', true).text('Refreshing...');
+                
+                $.post(ajaxurl, {
+                    action: 'jmigrate_refresh_archives',
+                    _ajax_nonce: '<?php echo wp_create_nonce( 'jmigrate_admin' ); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        location.reload(); // Simple refresh for now
+                    } else {
+                        alert('Error: ' + (response.data || 'Failed to refresh archives'));
+                    }
+                    button.prop('disabled', false).text('Refresh');
+                }).fail(function() {
+                    alert('Error: Failed to communicate with server');
+                    button.prop('disabled', false).text('Refresh');
+                });
+            });
         });
         </script>
         <?php
