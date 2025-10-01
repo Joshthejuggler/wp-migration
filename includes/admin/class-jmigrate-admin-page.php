@@ -587,6 +587,41 @@ class JMigrate_Admin_Page {
                 </form>
             </div>
         </div>
+        
+        <style>
+        .jmigrate-tab-content { display: none !important; }
+        .jmigrate-tab-content.active { display: block !important; }
+        </style>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            console.log('Inline tab script loaded');
+            
+            // Hide all content, show export by default
+            $('.jmigrate-tab-content').hide();
+            $('#jmigrate-export').show().addClass('active');
+            
+            // Handle tab clicks
+            $('.jmigrate-tab').on('click', function(e) {
+                e.preventDefault();
+                console.log('Tab clicked:', $(this).data('tab'));
+                
+                var target = $(this).data('tab');
+                
+                // Update tab appearance
+                $('.jmigrate-tab').removeClass('nav-tab-active');
+                $(this).addClass('nav-tab-active');
+                
+                // Show/hide content
+                $('.jmigrate-tab-content').hide().removeClass('active');
+                $('#jmigrate-' + target).show().addClass('active');
+                
+                console.log('Switched to tab:', target);
+            });
+            
+            console.log('Tab setup complete');
+        });
+        </script>
         <?php
     }
 
