@@ -52,20 +52,13 @@
     color: #007017;
 }
 
-/* Tab functionality */
-.jmigrate-tab-content {
-    display: none;
+/* Section styling */
+.jmigrate-section {
+    margin-bottom: 30px;
 }
 
-.jmigrate-tab-content.active {
-    display: block;
-}
-
-.nav-tab {
-    cursor: pointer;
-}
-
-.jmigrate-tab.active {
-    background: #fff;
-    border-bottom: 1px solid #fff;
+.jmigrate-section h2 {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
 }

@@ -541,12 +541,8 @@ class JMigrate_Admin_Page {
         <div class="wrap jmigrate-admin">
             <h1><?php esc_html_e( 'JMigrate Tools', 'jmigrate' ); ?></h1>
 
-            <h2 class="nav-tab-wrapper">
-                <a href="#jmigrate-export" class="nav-tab nav-tab-active jmigrate-tab" data-tab="export"><?php esc_html_e( 'Export', 'jmigrate' ); ?></a>
-                <a href="#jmigrate-import" class="nav-tab jmigrate-tab" data-tab="import"><?php esc_html_e( 'Import', 'jmigrate' ); ?></a>
-            </h2>
-
-            <div id="jmigrate-export" class="jmigrate-section jmigrate-tab-content active">
+            <div class="jmigrate-section">
+                <h2><?php esc_html_e( 'Export', 'jmigrate' ); ?></h2>
                 <p><?php esc_html_e( 'Create a migration archive that replaces your permanent URL with a temporary one.', 'jmigrate' ); ?></p>
 
                 <?php $this->render_notices( $context['export_errors'], $context['export_messages'] ); ?>
@@ -611,7 +607,10 @@ class JMigrate_Admin_Page {
                 </form>
             </div>
 
-            <div id="jmigrate-import" class="jmigrate-section jmigrate-tab-content">
+            <hr style="margin: 40px 0;">
+
+            <div class="jmigrate-section">
+                <h2><?php esc_html_e( 'Import', 'jmigrate' ); ?></h2>
                 <p><?php esc_html_e( 'Import a JMigrate archive into this site. Ensure the archive was created with JMigrate and that wp-config.php stays configured for this environment.', 'jmigrate' ); ?></p>
 
                 <?php
@@ -739,38 +738,9 @@ class JMigrate_Admin_Page {
             </div>
         </div>
         
-        <style>
-        .jmigrate-tab-content { display: none !important; }
-        .jmigrate-tab-content.active { display: block !important; }
-        </style>
-        
         <script>
         jQuery(document).ready(function($) {
-            console.log('Inline tab script loaded');
-            
-            // Hide all content, show export by default
-            $('.jmigrate-tab-content').hide();
-            $('#jmigrate-export').show().addClass('active');
-            
-            // Handle tab clicks
-            $('.jmigrate-tab').on('click', function(e) {
-                e.preventDefault();
-                console.log('Tab clicked:', $(this).data('tab'));
-                
-                var target = $(this).data('tab');
-                
-                // Update tab appearance
-                $('.jmigrate-tab').removeClass('nav-tab-active');
-                $(this).addClass('nav-tab-active');
-                
-                // Show/hide content
-                $('.jmigrate-tab-content').hide().removeClass('active');
-                $('#jmigrate-' + target).show().addClass('active');
-                
-                console.log('Switched to tab:', target);
-            });
-            
-            console.log('Tab setup complete');
+            console.log('JMigrate admin loaded');
             
             // Archive management functionality
             $('.jmigrate-delete-archive').on('click', function(e) {
