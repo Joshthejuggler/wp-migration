@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JMigrate
  * Description: Simple migration utility (Tier A).
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Josh
  * License: GPL2
  */
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'JMIGRATE_PLUGIN_VERSION' ) ) {
-    define( 'JMIGRATE_PLUGIN_VERSION', '0.1.0' );
+    define( 'JMIGRATE_PLUGIN_VERSION', '0.1.1' );
 }
 
 if ( ! defined( 'JMIGRATE_PLUGIN_DIR' ) ) {

@@ -7,7 +7,29 @@
     const nonce = jmigrateAdmin.nonce;
     const strings = jmigrateAdmin.strings || {};
 
-    // Initialize tabs
+    // Initialize tabs immediately
+    console.log('JMigrate admin script loaded');
+    
+    // Try immediate execution first
+    setTimeout(function() {
+        console.log('Attempting immediate tab setup');
+        setupTabs();
+    }, 100);
+    
+    // Also try after DOM ready
+    if (typeof jQuery !== 'undefined') {
+        jQuery(document).ready(function($) {
+            console.log('jQuery ready, setting up tabs');
+            setupTabs();
+        });
+    }
+    
+    // And try after window load
+    window.addEventListener('load', function() {
+        console.log('Window loaded, setting up tabs');
+        setupTabs();
+    });
+    
     initializeTabs();
 
     const importForm = document.getElementById( 'jmigrate-import-form' );
@@ -218,9 +240,78 @@
         }
     }
 
+    function setupTabs() {
+        console.log('setupTabs called');
+        
+        // Use vanilla JS first, then try jQuery if available
+        var tabButtons = document.querySelectorAll('.jmigrate-tab');
+        var tabContents = document.querySelectorAll('.jmigrate-tab-content');
+        
+        console.log('Found tab buttons:', tabButtons.length);
+        console.log('Found tab contents:', tabContents.length);
+        
+        if (tabButtons.length === 0 || tabContents.length === 0) {
+            console.log('No tabs found, retrying...');
+            return false;
+        }
+        
+        // Hide all content first
+        tabContents.forEach(function(content) {
+            content.classList.remove('active');
+            content.style.display = 'none';
+        });
+        
+        // Show export tab by default
+        var exportTab = document.getElementById('jmigrate-export');
+        if (exportTab) {
+            exportTab.classList.add('active');
+            exportTab.style.display = 'block';
+            console.log('Export tab shown by default');
+        }
+        
+        // Add click handlers
+        tabButtons.forEach(function(button) {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Tab clicked:', button.dataset.tab);
+                
+                var target = button.dataset.tab;
+                
+                // Remove active from all tabs
+                tabButtons.forEach(function(btn) {
+                    btn.classList.remove('nav-tab-active');
+                });
+                
+                // Hide all content
+                tabContents.forEach(function(content) {
+                    content.classList.remove('active');
+                    content.style.display = 'none';
+                });
+                
+                // Activate clicked tab
+                button.classList.add('nav-tab-active');
+                
+                // Show corresponding content
+                var targetContent = document.getElementById('jmigrate-' + target);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                    targetContent.style.display = 'block';
+                    console.log('Showing content for:', target);
+                }
+            });
+        });
+        
+        console.log('Tab setup complete');
+        return true;
+    }
+    
     function initializeTabs() {
         // Use jQuery for tab functionality
         jQuery(document).ready(function($) {
+            console.log('Tab initialization starting');
+            console.log('Tab content elements found:', $('.jmigrate-tab-content').length);
+            console.log('Tab elements found:', $('.jmigrate-tab').length);
+            
             // Initialize tabs - show export tab by default
             $('.jmigrate-tab-content').removeClass('active');
             $('#jmigrate-export').addClass('active');
