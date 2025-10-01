@@ -7,6 +7,9 @@
     const nonce = jmigrateAdmin.nonce;
     const strings = jmigrateAdmin.strings || {};
 
+    // Initialize tabs
+    initializeTabs();
+
     const importForm = document.getElementById( 'jmigrate-import-form' );
     if ( ! importForm || ! window.FormData ) {
         return;
@@ -213,5 +216,33 @@
         if ( runButton ) {
             runButton.disabled = !! disabled;
         }
+    }
+
+    function initializeTabs() {
+        // Use jQuery for tab functionality
+        jQuery(document).ready(function($) {
+            // Initialize tabs - show export tab by default
+            $('.jmigrate-tab-content').removeClass('active');
+            $('#jmigrate-export').addClass('active');
+            
+            // Handle tab clicks
+            $('.jmigrate-tab').on('click', function(e) {
+                e.preventDefault();
+                
+                var target = $(this).data('tab');
+                
+                // Remove active class from all tabs and nav-tab-active
+                $('.jmigrate-tab').removeClass('nav-tab-active');
+                
+                // Hide all tab content
+                $('.jmigrate-tab-content').removeClass('active');
+                
+                // Add active class to clicked tab
+                $(this).addClass('nav-tab-active');
+                
+                // Show corresponding section
+                $('#jmigrate-' + target).addClass('active');
+            });
+        });
     }
 })();

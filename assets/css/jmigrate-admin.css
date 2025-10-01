@@ -51,3 +51,21 @@
 .jmigrate-progress__log li.success {
     color: #007017;
 }
+
+/* Tab functionality */
+.jmigrate-tab-content {
+    display: none;
+}
+
+.jmigrate-tab-content.active {
+    display: block;
+}
+
+.nav-tab {
+    cursor: pointer;
+}
+
+.jmigrate-tab.active {
+    background: #fff;
+    border-bottom: 1px solid #fff;
+}

@@ -446,11 +446,11 @@ class JMigrate_Admin_Page {
             <h1><?php esc_html_e( 'JMigrate Tools', 'jmigrate' ); ?></h1>
 
             <h2 class="nav-tab-wrapper">
-                <a href="#jmigrate-export" class="nav-tab nav-tab-active" onclick="return false;"><?php esc_html_e( 'Export', 'jmigrate' ); ?></a>
-                <a href="#jmigrate-import" class="nav-tab" onclick="return false;"><?php esc_html_e( 'Import', 'jmigrate' ); ?></a>
+                <a href="#jmigrate-export" class="nav-tab nav-tab-active jmigrate-tab" data-tab="export"><?php esc_html_e( 'Export', 'jmigrate' ); ?></a>
+                <a href="#jmigrate-import" class="nav-tab jmigrate-tab" data-tab="import"><?php esc_html_e( 'Import', 'jmigrate' ); ?></a>
             </h2>
 
-            <div id="jmigrate-export" class="jmigrate-section">
+            <div id="jmigrate-export" class="jmigrate-section jmigrate-tab-content active">
                 <p><?php esc_html_e( 'Create a migration archive that replaces your permanent URL with a temporary one.', 'jmigrate' ); ?></p>
 
                 <?php $this->render_notices( $context['export_errors'], $context['export_messages'] ); ?>
@@ -476,7 +476,7 @@ class JMigrate_Admin_Page {
                     </div>
                 <?php endif; ?>
 
-                <form method="post" enctype="multipart/form-data" id="jmigrate-import-form">
+                <form method="post" enctype="multipart/form-data" id="jmigrate-export-form">
                     <?php wp_nonce_field( 'jmigrate_run_export' ); ?>
 
                     <table class="form-table" role="presentation">
@@ -515,9 +515,7 @@ class JMigrate_Admin_Page {
                 </form>
             </div>
 
-            <hr>
-
-            <div id="jmigrate-import" class="jmigrate-section">
+            <div id="jmigrate-import" class="jmigrate-section jmigrate-tab-content">
                 <p><?php esc_html_e( 'Import a JMigrate archive into this site. Ensure the archive was created with JMigrate and that wp-config.php stays configured for this environment.', 'jmigrate' ); ?></p>
 
                 <?php
